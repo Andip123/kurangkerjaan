@@ -2,7 +2,7 @@
 $servername = "localhost";
 $username = "root";
 $password = "";
-$dbname = "arsip";
+$dbname = "skripsi_arsip";
 
 $conn = new mysqli($servername, $username, $password, $dbname);
 

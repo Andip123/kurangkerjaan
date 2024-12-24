@@ -3,7 +3,7 @@ class Database {
     private $servername = "localhost";
     private $username = "root";
     private $password = "";
-    private $dbname = "arsip";
+    private $dbname = "skripsi_arsip";
     // private $conn;
 
     public function getConnection() {
