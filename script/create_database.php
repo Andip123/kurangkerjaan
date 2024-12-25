@@ -63,6 +63,7 @@ $tables = [
         kode_surat VARCHAR(50) NOT NULL,
         tanggal_masuk DATE NOT NULL,
         asal_surat VARCHAR(255) NOT NULL,
+        softfile VARCHAR(255) NOT NULL,
         jenis_surat VARCHAR(50) NOT NULL,
         FOREIGN KEY (penerima_id) REFERENCES pegawai(id)
     )",
@@ -146,9 +147,9 @@ $data = [
     ],
 
     "surat_masuk" => [
-        "INSERT IGNORE INTO surat_masuk (penerima_id, kode_surat, tanggal_masuk, asal_surat, jenis_surat) VALUES 
-        (1, 'SM-001', '2024-01-01', 'PT ABC', 'Resmi'),
-        (2, 'SM-002', '2024-01-02', 'PT XYZ', 'Internal')"
+        "INSERT IGNORE INTO surat_masuk (penerima_id, kode_surat, tanggal_masuk, asal_surat, softfile, jenis_surat) VALUES 
+        (1, 'SM-001', '2024-01-01', 'PT ABC', 'softfile.pdf', 'Resmi'),
+        (2, 'SM-002', '2024-01-02', 'PT XYZ', 'softfile.pdf', 'Internal')"
     ],
 
     "surat_keluar" => [

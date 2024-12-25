@@ -18,37 +18,21 @@ switch ($method) {
         // Handle GET request (Read data)
         if (isset($_GET['id'])) {
             $id = intval($_GET['id']);
-            $stmt = $pegawai->getById($id);
+            $data = $pegawai->getById($id);
 
-            $stmt->bind_result($id, $nrp_pegawai, $nama, $email, $nomor_hp, $kode_bagian, $pangkat, $jabatan, $deskripsi);
-
-            $data = [];
-            while ($stmt->fetch()) {
-                $data = [
-                    "id" => $id,
-                    "nrp_pegawai" => $nrp_pegawai,
-                    "nama" => $nama,
-                    "email" => $email,
-                    "nomor_hp" => $nomor_hp,
-                    "kode_bagian" => $kode_bagian,
-                    "pangkat" => $pangkat,
-                    "jabatan" => $jabatan,
-                    "deskripsi" => $deskripsi
-                ];
+            if ($data) {
+                echo json_encode([
+                    "status" => "success",
+                    "data" => $data
+                ]);
+            } else {
+                echo json_encode([
+                    "status" => "error",
+                    "message" => "Data tidak ditemukan"
+                ]);
             }
-
-            echo json_encode([
-                "status" => "success",
-                "data" => $data
-            ]);
         } else {
-            $result = $pegawai->getAll();
-
-            $data = [];
-            while ($row = $result->fetch_assoc()) {
-                $data[] = $row;
-            }
-
+            $data = $pegawai->getAll();
             echo json_encode([
                 "status" => "success",
                 "data" => $data
@@ -77,10 +61,13 @@ switch ($method) {
         $pegawai->jabatan = $input['jabatan'];
         $pegawai->deskripsi = $input['deskripsi'];
 
-        if ($pegawai->create()) {
+        $data = $pegawai->create();
+
+        if ($data) {
             echo json_encode([
                 "status" => "success",
-                "message" => "Data berhasil ditambahkan"
+                "message" => "Data berhasil ditambahkan",
+                "data" => $data
             ]);
         } else {
             echo json_encode([
@@ -90,40 +77,62 @@ switch ($method) {
         }
         break;
 
-    case 'PUT':
-        // Handle PUT request (Update data)
-        $input = json_decode(file_get_contents('php://input'), true);
-
-        if (!isset($input['id'], $input['nrp_pegawai'], $input['nama'], $input['email'], $input['nomor_hp'], $input['kode_bagian'], $input['pangkat'], $input['jabatan'], $input['deskripsi'])) {
-            echo json_encode([
-                "status" => "error",
-                "message" => "Data tidak lengkap"
-            ]);
-            exit;
-        }
-
-        $id = intval($input['id']);
-        $pegawai->nrp_pegawai = $input['nrp_pegawai'];
-        $pegawai->nama = $input['nama'];
-        $pegawai->email = $input['email'];
-        $pegawai->nomor_hp = $input['nomor_hp'];
-        $pegawai->kode_bagian = $input['kode_bagian'];
-        $pegawai->pangkat = $input['pangkat'];
-        $pegawai->jabatan = $input['jabatan'];
-        $pegawai->deskripsi = $input['deskripsi'];
-
-        if ($pegawai->update($id)) {
-            echo json_encode([
-                "status" => "success",
-                "message" => "Data berhasil diperbarui"
-            ]);
-        } else {
-            echo json_encode([
-                "status" => "error",
-                "message" => "Gagal memperbarui data"
-            ]);
-        }
-        break;
+        case 'PUT':
+            try {
+                // Handle PUT request (Update data)
+                $input = json_decode(file_get_contents('php://input'), true);
+        
+                if (!isset($input['id'], $input['nrp_pegawai'], $input['nama'], $input['email'], $input['nomor_hp'], $input['kode_bagian'], $input['pangkat'], $input['jabatan'], $input['deskripsi'])) {
+                    echo json_encode([
+                        "status" => "error",
+                        "message" => "Data tidak lengkap"
+                    ]);
+                    exit;
+                }
+        
+                $id = intval($input['id']);
+                $beforeUpdate = $pegawai->getById($id); // Data sebelum update
+        
+                if (!$beforeUpdate) {
+                    echo json_encode([
+                        "status" => "error",
+                        "message" => "Data dengan ID $id tidak ditemukan"
+                    ]);
+                    exit;
+                }
+        
+                $pegawai->nrp_pegawai = $input['nrp_pegawai'];
+                $pegawai->nama = $input['nama'];
+                $pegawai->email = $input['email'];
+                $pegawai->nomor_hp = $input['nomor_hp'];
+                $pegawai->kode_bagian = $input['kode_bagian'];
+                $pegawai->pangkat = $input['pangkat'];
+                $pegawai->jabatan = $input['jabatan'];
+                $pegawai->deskripsi = $input['deskripsi'];
+        
+                $isUpdated = $pegawai->update($id); // Update data
+        
+                if ($isUpdated) {
+                    $afterUpdate = $pegawai->getById($id); // Data setelah update
+                    echo json_encode([
+                        "status" => "success",
+                        "message" => "Data berhasil diperbarui",
+                        "before_update" => $beforeUpdate,
+                        "after_update" => $afterUpdate
+                    ]);
+                } else {
+                    echo json_encode([
+                        "status" => "error",
+                        "message" => "Gagal memperbarui data"
+                    ]);
+                }
+            } catch (Exception $e) {
+                echo json_encode([
+                    "status" => "error",
+                    "message" => $e->getMessage()
+                ]);
+            }
+            break;
 
     case 'DELETE':
         // Handle DELETE request
@@ -141,10 +150,13 @@ switch ($method) {
             exit;
         }
 
-        if ($pegawai->delete($id)) {
+        $dataBeforeDelete = $pegawai->getById($id);
+
+        if ($dataBeforeDelete && $pegawai->delete($id)) {
             echo json_encode([
                 "status" => "success",
-                "message" => "Data berhasil dihapus"
+                "message" => "Data berhasil dihapus",
+                "deleted_data" => $dataBeforeDelete
             ]);
         } else {
             echo json_encode([

@@ -8,47 +8,30 @@ $database = new Database();
 $conn = $database->getConnection();
 
 $suratKeluar = new SuratKeluar($conn);
+$activityLog = new ActivityLog($conn);
 
-// Cek request method
 $method = $_SERVER['REQUEST_METHOD'];
 
 switch ($method) {
     case 'GET':
-        // Handle GET request (Read data)
+        // Handle GET request
         if (isset($_GET['id'])) {
             $id = intval($_GET['id']);
-            $stmt = $suratKeluar->getById($id);
+            $data = $suratKeluar->getById($id);
 
-            // Gunakan bind_result dan fetch untuk menangani data dari statement
-            $data = [];
-            if ($stmt->num_rows > 0) {
-                $stmt->bind_result($id, $tanggal_surat, $nrp_pegawai, $penerima, $softfile, $jenis_surat, $nama_pegawai);
-                while ($stmt->fetch()) {
-                    $data = [
-                        "id" => $id,
-                        "tanggal_surat" => $tanggal_surat,
-                        "nrp_pegawai" => $nrp_pegawai,
-                        "penerima" => $penerima,
-                        "softfile" => $softfile,
-                        "jenis_surat" => $jenis_surat,
-                        "nama_pegawai" => $nama_pegawai
-                    ];
-                }
+            if ($data) {
+                echo json_encode([
+                    "status" => "success",
+                    "data" => $data
+                ]);
+            } else {
+                echo json_encode([
+                    "status" => "error",
+                    "message" => "Data tidak ditemukan"
+                ]);
             }
-
-            echo json_encode([
-                "status" => "success",
-                "data" => $data
-            ]);
         } else {
-            // Ambil semua data surat keluar
-            $result = $suratKeluar->getAll();
-            $data = [];
-
-            while ($row = $result->fetch_assoc()) {
-                $data[] = $row;
-            }
-
+            $data = $suratKeluar->getAll();
             echo json_encode([
                 "status" => "success",
                 "data" => $data
@@ -57,7 +40,7 @@ switch ($method) {
         break;
 
     case 'POST':
-        // Handle POST request (Create data)
+        // Handle POST request
         $input = json_decode(file_get_contents('php://input'), true);
 
         if (!isset($input['tanggal_surat'], $input['nrp_pegawai'], $input['penerima'], $input['softfile'], $input['jenis_surat'])) {
@@ -74,10 +57,13 @@ switch ($method) {
         $suratKeluar->softfile = $input['softfile'];
         $suratKeluar->jenis_surat = $input['jenis_surat'];
 
-        if ($suratKeluar->create()) {
+        $createdData = $suratKeluar->create();
+        if ($createdData) {
+            $activityLog->log(1, "POST", "Menambahkan surat keluar: " . json_encode($createdData));
             echo json_encode([
                 "status" => "success",
-                "message" => "Data berhasil ditambahkan"
+                "message" => "Data berhasil ditambahkan",
+                "created_data" => $createdData
             ]);
         } else {
             echo json_encode([
@@ -88,7 +74,7 @@ switch ($method) {
         break;
 
     case 'PUT':
-        // Handle PUT request (Update data)
+        // Handle PUT request
         $input = json_decode(file_get_contents('php://input'), true);
 
         if (!isset($input['id'], $input['tanggal_surat'], $input['nrp_pegawai'], $input['penerima'], $input['softfile'], $input['jenis_surat'])) {
@@ -100,16 +86,32 @@ switch ($method) {
         }
 
         $id = intval($input['id']);
+        $suratKeluar->id = $id;
+
+        // Ambil data sebelum diperbarui
+        $beforeUpdateData = $suratKeluar->getById($id);
+        if (!$beforeUpdateData) {
+            echo json_encode([
+                "status" => "error",
+                "message" => "Data tidak ditemukan"
+            ]);
+            exit;
+        }
+
         $suratKeluar->tanggal_surat = $input['tanggal_surat'];
         $suratKeluar->nrp_pegawai = $input['nrp_pegawai'];
         $suratKeluar->penerima = $input['penerima'];
         $suratKeluar->softfile = $input['softfile'];
         $suratKeluar->jenis_surat = $input['jenis_surat'];
 
-        if ($suratKeluar->update($id)) {
+        $updatedData = $suratKeluar->update($id);
+        if ($updatedData) {
+            $activityLog->log(1, "PUT", "Memperbarui surat keluar dari: " . json_encode($beforeUpdateData) . " menjadi: " . json_encode($updatedData));
             echo json_encode([
                 "status" => "success",
-                "message" => "Data berhasil diperbarui"
+                "message" => "Data berhasil diperbarui",
+                "before_update" => $beforeUpdateData,
+                "after_update" => $updatedData
             ]);
         } else {
             echo json_encode([
@@ -119,40 +121,40 @@ switch ($method) {
         }
         break;
 
-        case 'DELETE':
-    // Handle DELETE request
-    $input = json_decode(file_get_contents('php://input'), true);
+    case 'DELETE':
+        // Handle DELETE request
+        if (!isset($_GET['id'])) {
+            echo json_encode([
+                "status" => "error",
+                "message" => "ID tidak diberikan"
+            ]);
+            exit;
+        }
 
-    if (isset($_GET['id'])) {
-        // Ambil ID dari query parameter
         $id = intval($_GET['id']);
-    } elseif (isset($input['id'])) {
-        // Ambil ID dari body JSON
-        $id = intval($input['id']);
-    } else {
+        $deletedData = $suratKeluar->delete($id);
+
+        if ($deletedData) {
+            $activityLog->log(1, "DELETE", "Menghapus surat keluar dengan ID: $id");
+            echo json_encode([
+                "status" => "success",
+                "message" => "Data berhasil dihapus",
+                "deleted_data" => $deletedData
+            ]);
+        } else {
+            echo json_encode([
+                "status" => "error",
+                "message" => "Gagal menghapus data"
+            ]);
+        }
+        break;
+
+    default:
         echo json_encode([
             "status" => "error",
-            "message" => "ID tidak diberikan"
+            "message" => "Metode tidak didukung"
         ]);
-        exit;
-    }
-
-    $stmt = $conn->prepare("DELETE FROM surat_keluar WHERE id = ?");
-    $stmt->bind_param("i", $id);
-
-    if ($stmt->execute()) {
-        echo json_encode([
-            "status" => "success",
-            "message" => "Data berhasil dihapus"
-        ]);
-    } else {
-        echo json_encode([
-            "status" => "error",
-            "message" => "Gagal menghapus data: " . $stmt->error
-        ]);
-    }
-    break;
-
+        break;
 }
 
 $conn->close();

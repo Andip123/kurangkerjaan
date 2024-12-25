@@ -3,6 +3,13 @@ class SuratKeluar {
     private $conn;
     private $table = "surat_keluar";
 
+    public $id;
+    public $tanggal_surat;
+    public $nrp_pegawai;
+    public $penerima;
+    public $softfile;
+    public $jenis_surat;
+
     public function __construct($db) {
         $this->conn = $db;
     }
@@ -11,19 +18,27 @@ class SuratKeluar {
         $query = "SELECT sk.*, p.nama AS nama_pegawai 
                   FROM " . $this->table . " sk 
                   JOIN pegawai p ON sk.nrp_pegawai = p.nrp_pegawai";
-        $result = $this->conn->query($query);
-        return $result;
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        $data = [];
+        while ($row = $result->fetch_assoc()) {
+            $data[] = $row;
+        }
+        return $data;
     }
 
     public function getById($id) {
-        $query = "SELECT sk.id, sk.tanggal_surat, sk.nrp_pegawai, sk.penerima, sk.softfile, sk.jenis_surat, p.nama AS nama_pegawai 
+        $query = "SELECT sk.*, p.nama AS nama_pegawai 
                   FROM " . $this->table . " sk 
                   JOIN pegawai p ON sk.nrp_pegawai = p.nrp_pegawai 
                   WHERE sk.id = ?";
         $stmt = $this->conn->prepare($query);
         $stmt->bind_param("i", $id);
         $stmt->execute();
-        return $stmt;
+        $result = $stmt->get_result();
+        return $result->fetch_assoc();
     }
 
     public function create() {
@@ -32,23 +47,40 @@ class SuratKeluar {
                   VALUES (?, ?, ?, ?, ?)";
         $stmt = $this->conn->prepare($query);
         $stmt->bind_param("sssss", $this->tanggal_surat, $this->nrp_pegawai, $this->penerima, $this->softfile, $this->jenis_surat);
-        return $stmt->execute();
+    
+        if ($stmt->execute()) {
+            return $this->getById($this->conn->insert_id); // Ambil data yang baru dibuat
+        }
+        return false;
     }
-
+    
     public function update($id) {
         $query = "UPDATE " . $this->table . " 
                   SET tanggal_surat = ?, nrp_pegawai = ?, penerima = ?, softfile = ?, jenis_surat = ? 
                   WHERE id = ?";
         $stmt = $this->conn->prepare($query);
         $stmt->bind_param("sssssi", $this->tanggal_surat, $this->nrp_pegawai, $this->penerima, $this->softfile, $this->jenis_surat, $id);
-        return $stmt->execute();
+    
+        if ($stmt->execute()) {
+            return $this->getById($id); // Ambil data setelah diperbarui
+        }
+        return false;
     }
-
+    
+    
     public function delete($id) {
-        $query = "DELETE FROM " . $this->table . " WHERE id = ?";
-        $stmt = $this->conn->prepare($query);
-        $stmt->bind_param("i", $id);
-        return $stmt->execute();
-    }
+        $dataBeforeDelete = $this->getById($id); // Ambil data sebelum dihapus
+    
+        if ($dataBeforeDelete) {
+            $query = "DELETE FROM " . $this->table . " WHERE id = ?";
+            $stmt = $this->conn->prepare($query);
+            $stmt->bind_param("i", $id);
+    
+            if ($stmt->execute()) {
+                return $dataBeforeDelete; // Kembalikan data yang dihapus
+            }
+        }
+        return false;
+    }    
 }
 ?>
