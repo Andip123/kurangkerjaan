@@ -43,6 +43,17 @@ class Pegawai {
             return null;
         }
     }
+
+    public function isKodeBagianValid($kode_bagian) {
+        $query = "SELECT COUNT(*) AS count FROM divisi WHERE kode_divisi = ?";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bind_param("s", $kode_bagian);
+        $stmt->execute();
+        $stmt->bind_result($count);
+        $stmt->fetch();
+        return $count > 0;
+    }
+    
     
 
     public function create() {

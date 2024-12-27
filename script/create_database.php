@@ -10,7 +10,7 @@ if ($conn === null) {
 }
 
 // Pilih database
-$conn->select_db("skripsi_arsip");
+$conn->select_db("polresdemak_arsip");
 
 // Query pembuatan tabel
 $tables = [

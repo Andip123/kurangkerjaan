@@ -39,87 +39,103 @@ switch ($method) {
         }
         break;
 
-    case 'POST':
-        // Handle POST request
-        $input = json_decode(file_get_contents('php://input'), true);
+        case 'POST':
+            $input = json_decode(file_get_contents('php://input'), true);
+        
+            if (!isset($input['tanggal_surat'], $input['nrp_pegawai'], $input['penerima'], $input['softfile'], $input['jenis_surat'], $input['nama_pegawai'])) {
+                echo json_encode([
+                    "status" => "error",
+                    "message" => "Data tidak lengkap"
+                ]);
+                exit;
+            }
+        
+            $suratKeluar->tanggal_surat = $input['tanggal_surat'];
+            $suratKeluar->nrp_pegawai = $input['nrp_pegawai'];
+            $suratKeluar->penerima = $input['penerima'];
+            $suratKeluar->softfile = $input['softfile'];
+            $suratKeluar->jenis_surat = $input['jenis_surat'];
+            $suratKeluar->nama_pegawai = $input['nama_pegawai'];
+        
+            // Validasi NRP Pegawai
+            if (!$suratKeluar->isNrpPegawaiValid($suratKeluar->nrp_pegawai)) {
+                echo json_encode([
+                    "status" => "error",
+                    "message" => "NRP Pegawai '" . $suratKeluar->nrp_pegawai . "' tidak ditemukan di tabel pegawai"
+                ]);
+                exit;
+            }
+        
+            if ($suratKeluar->create()) {
+                echo json_encode([
+                    "status" => "success",
+                    "message" => "Data surat keluar berhasil ditambahkan"
+                ]);
+            } else {
+                echo json_encode([
+                    "status" => "error",
+                    "message" => "Gagal menambahkan data surat keluar"
+                ]);
+            }
+            break;
+        
 
-        if (!isset($input['tanggal_surat'], $input['nrp_pegawai'], $input['penerima'], $input['softfile'], $input['jenis_surat'])) {
-            echo json_encode([
-                "status" => "error",
-                "message" => "Data tidak lengkap"
-            ]);
-            exit;
-        }
-
-        $suratKeluar->tanggal_surat = $input['tanggal_surat'];
-        $suratKeluar->nrp_pegawai = $input['nrp_pegawai'];
-        $suratKeluar->penerima = $input['penerima'];
-        $suratKeluar->softfile = $input['softfile'];
-        $suratKeluar->jenis_surat = $input['jenis_surat'];
-
-        $createdData = $suratKeluar->create();
-        if ($createdData) {
-            $activityLog->log(1, "POST", "Menambahkan surat keluar: " . json_encode($createdData));
-            echo json_encode([
-                "status" => "success",
-                "message" => "Data berhasil ditambahkan",
-                "created_data" => $createdData
-            ]);
-        } else {
-            echo json_encode([
-                "status" => "error",
-                "message" => "Gagal menambahkan data"
-            ]);
-        }
-        break;
-
-    case 'PUT':
-        // Handle PUT request
-        $input = json_decode(file_get_contents('php://input'), true);
-
-        if (!isset($input['id'], $input['tanggal_surat'], $input['nrp_pegawai'], $input['penerima'], $input['softfile'], $input['jenis_surat'])) {
-            echo json_encode([
-                "status" => "error",
-                "message" => "Data tidak lengkap"
-            ]);
-            exit;
-        }
-
-        $id = intval($input['id']);
-        $suratKeluar->id = $id;
-
-        // Ambil data sebelum diperbarui
-        $beforeUpdateData = $suratKeluar->getById($id);
-        if (!$beforeUpdateData) {
-            echo json_encode([
-                "status" => "error",
-                "message" => "Data tidak ditemukan"
-            ]);
-            exit;
-        }
-
-        $suratKeluar->tanggal_surat = $input['tanggal_surat'];
-        $suratKeluar->nrp_pegawai = $input['nrp_pegawai'];
-        $suratKeluar->penerima = $input['penerima'];
-        $suratKeluar->softfile = $input['softfile'];
-        $suratKeluar->jenis_surat = $input['jenis_surat'];
-
-        $updatedData = $suratKeluar->update($id);
-        if ($updatedData) {
-            $activityLog->log(1, "PUT", "Memperbarui surat keluar dari: " . json_encode($beforeUpdateData) . " menjadi: " . json_encode($updatedData));
-            echo json_encode([
-                "status" => "success",
-                "message" => "Data berhasil diperbarui",
-                "before_update" => $beforeUpdateData,
-                "after_update" => $updatedData
-            ]);
-        } else {
-            echo json_encode([
-                "status" => "error",
-                "message" => "Gagal memperbarui data"
-            ]);
-        }
-        break;
+            case 'PUT':
+                $input = json_decode(file_get_contents('php://input'), true);
+            
+                if (!isset($input['id'], $input['tanggal_surat'], $input['nrp_pegawai'], $input['penerima'], $input['softfile'], $input['jenis_surat'], $input['nama_pegawai'])) {
+                    echo json_encode([
+                        "status" => "error",
+                        "message" => "Data tidak lengkap"
+                    ]);
+                    exit;
+                }
+            
+                $id = intval($input['id']);
+                $suratKeluar->tanggal_surat = $input['tanggal_surat'];
+                $suratKeluar->nrp_pegawai = $input['nrp_pegawai'];
+                $suratKeluar->penerima = $input['penerima'];
+                $suratKeluar->softfile = $input['softfile'];
+                $suratKeluar->jenis_surat = $input['jenis_surat'];
+                $suratKeluar->nama_pegawai = $input['nama_pegawai'];
+            
+                // Validasi apakah ID surat keluar ada
+                $beforeUpdate = $suratKeluar->getById($id);
+                if (!$beforeUpdate) {
+                    echo json_encode([
+                        "status" => "error",
+                        "message" => "Data dengan ID $id tidak ditemukan"
+                    ]);
+                    exit;
+                }
+            
+                // Validasi apakah nrp_pegawai valid
+                if (!$suratKeluar->isNrpPegawaiValid($suratKeluar->nrp_pegawai)) {
+                    echo json_encode([
+                        "status" => "error",
+                        "message" => "NRP Pegawai '" . $suratKeluar->nrp_pegawai . "' tidak ditemukan di tabel pegawai"
+                    ]);
+                    exit;
+                }
+            
+                // Perbarui data
+                if ($suratKeluar->update($id)) {
+                    $afterUpdate = $suratKeluar->getById($id);
+                    echo json_encode([
+                        "status" => "success",
+                        "message" => "Data surat keluar berhasil diperbarui",
+                        "before_update" => $beforeUpdate,
+                        "after_update" => $afterUpdate
+                    ]);
+                } else {
+                    echo json_encode([
+                        "status" => "error",
+                        "message" => "Gagal memperbarui data surat keluar"
+                    ]);
+                }
+                break;
+            
+            
 
     case 'DELETE':
         // Handle DELETE request

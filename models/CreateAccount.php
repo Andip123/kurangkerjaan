@@ -13,37 +13,63 @@ class CreateAccount {
         $this->conn = $db;
     }
 
-    // Create a new account
+    // Method untuk membuat akun
     public function create() {
         $query = "INSERT INTO " . $this->table . " (nama, email, password, role) VALUES (?, ?, ?, ?)";
         $stmt = $this->conn->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Prepare statement failed: " . $this->conn->error);
+        }
+    
+        // Hash password sebelum menyimpannya ke database
+        $this->password = password_hash($this->password, PASSWORD_DEFAULT);
+    
         $stmt->bind_param("ssss", $this->nama, $this->email, $this->password, $this->role);
-        return $stmt->execute();
+    
+        if ($stmt->execute()) {
+            error_log("Akun berhasil dibuat untuk: " . $this->email);
+            return true;
+        } else {
+            error_log("Error saat membuat akun: " . $stmt->error);
+            return false;
+        }
     }
+    
+
+    // Method untuk mengecek apakah email sudah ada
     public function emailExists() {
-        $query = "SELECT id FROM " . $this->table . " WHERE email = ?";
+        $query = "SELECT email FROM " . $this->table . " WHERE LOWER(email) = LOWER(?)";
         $stmt = $this->conn->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Prepare statement failed: " . $this->conn->error);
+        }
         $stmt->bind_param("s", $this->email);
         $stmt->execute();
         $stmt->store_result();
-    
         return $stmt->num_rows > 0;
-    }    
+    }
 
-    // Get all accounts
+    // Method untuk mendapatkan semua akun
     public function getAll() {
         $query = "SELECT id, nama, email, role FROM " . $this->table;
         $result = $this->conn->query($query);
-        return $result;
+        if (!$result) {
+            throw new Exception("Query failed: " . $this->conn->error);
+        }
+        return $result->fetch_all(MYSQLI_ASSOC);
     }
 
-    // Get account by ID
+    // Method untuk mendapatkan akun berdasarkan ID
     public function getById($id) {
         $query = "SELECT id, nama, email, role FROM " . $this->table . " WHERE id = ?";
         $stmt = $this->conn->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Prepare statement failed: " . $this->conn->error);
+        }
         $stmt->bind_param("i", $id);
         $stmt->execute();
-        return $stmt;
+        $result = $stmt->get_result();
+        return $result->fetch_assoc();
     }
 }
 ?>

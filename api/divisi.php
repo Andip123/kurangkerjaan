@@ -15,35 +15,23 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 switch ($method) {
     case 'GET':
-        // Handle GET request (Read data)
         if (isset($_GET['id'])) {
             $id = intval($_GET['id']);
-            $stmt = $divisi->getById($id);
+            $data = $divisi->getById($id);
 
-            $stmt->bind_result($id, $kode_divisi, $nama_divisi, $alamat_kantor);
-
-            $data = [];
-            while ($stmt->fetch()) {
-                $data = [
-                    "id" => $id,
-                    "kode_divisi" => $kode_divisi,
-                    "nama_divisi" => $nama_divisi,
-                    "alamat_kantor" => $alamat_kantor
-                ];
+            if ($data) {
+                echo json_encode([
+                    "status" => "success",
+                    "data" => $data
+                ]);
+            } else {
+                echo json_encode([
+                    "status" => "error",
+                    "message" => "Data tidak ditemukan"
+                ]);
             }
-
-            echo json_encode([
-                "status" => "success",
-                "data" => $data
-            ]);
         } else {
-            $result = $divisi->getAll();
-
-            $data = [];
-            while ($row = $result->fetch_assoc()) {
-                $data[] = $row;
-            }
-
+            $data = $divisi->getAll();
             echo json_encode([
                 "status" => "success",
                 "data" => $data
@@ -52,7 +40,6 @@ switch ($method) {
         break;
 
     case 'POST':
-        // Handle POST request (Create data)
         $input = json_decode(file_get_contents('php://input'), true);
 
         if (!isset($input['kode_divisi'], $input['nama_divisi'], $input['alamat_kantor'])) {
@@ -67,10 +54,21 @@ switch ($method) {
         $divisi->nama_divisi = $input['nama_divisi'];
         $divisi->alamat_kantor = $input['alamat_kantor'];
 
-        if ($divisi->create()) {
+        if ($divisi->isDuplicate($divisi->kode_divisi)) {
+            echo json_encode([
+                "status" => "error",
+                "message" => "Kode divisi sudah ada, gunakan kode yang berbeda."
+            ]);
+            exit;
+        }
+
+        $createdId = $divisi->create();
+
+        if ($createdId) {
             echo json_encode([
                 "status" => "success",
-                "message" => "Data berhasil ditambahkan"
+                "message" => "Data berhasil ditambahkan",
+                "data" => $divisi->getById($createdId)
             ]);
         } else {
             echo json_encode([
@@ -80,48 +78,70 @@ switch ($method) {
         }
         break;
 
-    case 'PUT':
-        // Handle PUT request (Update data)
-        $input = json_decode(file_get_contents('php://input'), true);
-
-        if (!isset($input['id'], $input['kode_divisi'], $input['nama_divisi'], $input['alamat_kantor'])) {
-            echo json_encode([
-                "status" => "error",
-                "message" => "Data tidak lengkap"
-            ]);
-            exit;
-        }
-
-        $id = intval($input['id']);
-        $divisi->kode_divisi = $input['kode_divisi'];
-        $divisi->nama_divisi = $input['nama_divisi'];
-        $divisi->alamat_kantor = $input['alamat_kantor'];
-
-        if ($divisi->update($id)) {
-            echo json_encode([
-                "status" => "success",
-                "message" => "Data berhasil diperbarui"
-            ]);
-        } else {
-            echo json_encode([
-                "status" => "error",
-                "message" => "Gagal memperbarui data"
-            ]);
-        }
-        break;
+        case 'PUT':
+            $input = json_decode(file_get_contents('php://input'), true);
+        
+            if (!isset($input['id'], $input['kode_divisi'], $input['nama_divisi'], $input['alamat_kantor'])) {
+                echo json_encode([
+                    "status" => "error",
+                    "message" => "Data tidak lengkap"
+                ]);
+                exit;
+            }
+        
+            $id = intval($input['id']);
+            
+            // Periksa apakah ID ada di database
+            $beforeUpdate = $divisi->getById($id);
+        
+            if (!$beforeUpdate) {
+                echo json_encode([
+                    "status" => "error",
+                    "message" => "ID $id tidak ditemukan di database"
+                ]);
+                exit;
+            }
+        
+            // Periksa apakah kode_divisi digunakan oleh ID lain
+            if ($divisi->isKodeDivisiUsedByOther($input['kode_divisi'], $id)) {
+                echo json_encode([
+                    "status" => "error",
+                    "message" => "Kode divisi sudah digunakan oleh ID lain, gunakan kode divisi yang berbeda"
+                ]);
+                exit;
+            }
+        
+            // Proses update data
+            $divisi->kode_divisi = $input['kode_divisi'];
+            $divisi->nama_divisi = $input['nama_divisi'];
+            $divisi->alamat_kantor = $input['alamat_kantor'];
+        
+            if ($divisi->update($id)) {
+                $afterUpdate = $divisi->getById($id); // Data setelah update
+                echo json_encode([
+                    "status" => "success",
+                    "message" => "Data berhasil diperbarui",
+                    "before_update" => $beforeUpdate,
+                    "after_update" => $afterUpdate
+                ]);
+            } else {
+                echo json_encode([
+                    "status" => "error",
+                    "message" => "Gagal memperbarui data"
+                ]);
+            }
+            break;
+        
+        
 
         case 'DELETE':
-            // Baca input dari body JSON atau query string
             $input = json_decode(file_get_contents('php://input'), true);
         
             if (isset($_GET['id'])) {
-                // Ambil ID dari query string
                 $id = intval($_GET['id']);
             } elseif (isset($input['id'])) {
-                // Ambil ID dari body JSON
                 $id = intval($input['id']);
             } else {
-                // Jika ID tidak ditemukan
                 echo json_encode([
                     "status" => "error",
                     "message" => "ID tidak diberikan"
@@ -129,16 +149,28 @@ switch ($method) {
                 exit;
             }
         
-            // Proses penghapusan data
+            // Ambil data sebelum dihapus
+            $dataBeforeDelete = $divisi->getById($id);
+        
+            if (!$dataBeforeDelete) {
+                echo json_encode([
+                    "status" => "error",
+                    "message" => "Data dengan ID $id tidak ditemukan"
+                ]);
+                exit;
+            }
+        
+            // Hapus data jika tidak ada constraint yang melanggar
             if ($divisi->delete($id)) {
                 echo json_encode([
                     "status" => "success",
-                    "message" => "Data berhasil dihapus"
+                    "message" => "Data berhasil dihapus",
+                    "deleted_data" => $dataBeforeDelete
                 ]);
             } else {
                 echo json_encode([
                     "status" => "error",
-                    "message" => "Gagal menghapus data"
+                    "message" => "Gagal menghapus data, pastikan tidak ada data terkait"
                 ]);
             }
             break;

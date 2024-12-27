@@ -41,6 +41,17 @@ class SuratKeluar {
         return $result->fetch_assoc();
     }
 
+    public function isNrpPegawaiValid($nrp_pegawai) {
+        $query = "SELECT COUNT(*) AS count FROM pegawai WHERE nrp_pegawai = ?";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bind_param("s", $nrp_pegawai);
+        $stmt->execute();
+        $stmt->bind_result($count);
+        $stmt->fetch();
+        return $count > 0;
+    }
+    
+
     public function create() {
         $query = "INSERT INTO " . $this->table . " 
                   (tanggal_surat, nrp_pegawai, penerima, softfile, jenis_surat) 

@@ -11,42 +11,38 @@ class Kategori {
         $this->conn = $db;
     }
 
-    // Get all Kategori
     public function getAll() {
         $query = "SELECT * FROM " . $this->table;
-        $result = $this->conn->query($query);
-        return $result;
+        $stmt = $this->conn->query($query);
+        return $stmt->fetch_all(MYSQLI_ASSOC); // Ambil semua data
     }
 
-    // Get Kategori by ID
     public function getById($id) {
         $query = "SELECT * FROM " . $this->table . " WHERE id = ?";
         $stmt = $this->conn->prepare($query);
         $stmt->bind_param("i", $id);
         $stmt->execute();
-        return $stmt;
+        $result = $stmt->get_result();
+        return $result->fetch_assoc(); // Ambil satu baris data
     }
 
-    // Create new Kategori
     public function create() {
-        $query = "INSERT INTO " . $this->table . " (nama, deskripsi) 
-                  VALUES (?, ?)";
+        $query = "INSERT INTO " . $this->table . " (nama, deskripsi) VALUES (?, ?)";
         $stmt = $this->conn->prepare($query);
         $stmt->bind_param("ss", $this->nama, $this->deskripsi);
-        return $stmt->execute();
+        if ($stmt->execute()) {
+            return $stmt->insert_id; // Kembalikan ID data baru
+        }
+        return false;
     }
 
-    // Update existing Kategori
     public function update($id) {
-        $query = "UPDATE " . $this->table . " 
-                  SET nama = ?, deskripsi = ? 
-                  WHERE id = ?";
+        $query = "UPDATE " . $this->table . " SET nama = ?, deskripsi = ? WHERE id = ?";
         $stmt = $this->conn->prepare($query);
         $stmt->bind_param("ssi", $this->nama, $this->deskripsi, $id);
         return $stmt->execute();
     }
 
-    // Delete Kategori
     public function delete($id) {
         $query = "DELETE FROM " . $this->table . " WHERE id = ?";
         $stmt = $this->conn->prepare($query);

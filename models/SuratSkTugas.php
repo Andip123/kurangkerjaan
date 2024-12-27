@@ -8,18 +8,24 @@ class SuratSkTugas {
     public $nrp_pegawai;
     public $deskripsi;
     public $softfile;
+    public $nama_pegawai;
 
     public function __construct($db) {
         $this->conn = $db;
     }
 
-    // Get all Surat Keterangan Tugas
-    public function getAll() {
-        $query = "SELECT skt.*, p.nama AS nama_pegawai 
-                  FROM " . $this->table . " skt 
-                  JOIN pegawai p ON skt.nrp_pegawai = p.nrp_pegawai";
-        $result = $this->conn->query($query);
-        return $result->fetch_all(MYSQLI_ASSOC); // Mengembalikan semua data dalam bentuk array asosiatif
+    public function isNamaPegawaiValid($nrp_pegawai, $nama_pegawai) {
+        $query = "SELECT COUNT(*) AS count 
+                  FROM pegawai 
+                  WHERE nrp_pegawai = ? AND nama = ?";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bind_param("ss", $nrp_pegawai, $nama_pegawai);
+        $stmt->execute();
+        $stmt->bind_result($count);
+        $stmt->fetch();
+        $stmt->close();
+
+        return $count > 0;
     }
 
     public function getById($id) {
@@ -30,26 +36,29 @@ class SuratSkTugas {
         $stmt = $this->conn->prepare($query);
         $stmt->bind_param("i", $id);
         $stmt->execute();
-        $result = $stmt->get_result(); // Menggunakan get_result untuk mendapatkan objek result
-        return $result->fetch_assoc(); // Kembalikan satu baris data
-    }
-
-    // Create new Surat Keterangan Tugas
-    public function create() {
-        // Periksa apakah nrp_pegawai ada di tabel pegawai
-        $query_check = "SELECT * FROM pegawai WHERE nrp_pegawai = ?";
-        $stmt_check = $this->conn->prepare($query_check);
-        $stmt_check->bind_param("s", $this->nrp_pegawai);
-        $stmt_check->execute();
-        $result_check = $stmt_check->get_result();
+        $result = $stmt->get_result();
     
-        if ($result_check->num_rows === 0) {
-            return [
-                "error" => "nrp_pegawai tidak ditemukan di tabel pegawai"
-            ];
+        return $result->fetch_assoc(); // Mengembalikan satu baris data sebagai array asosiatif
+    }    
+
+    public function getAll() {
+        $query = "SELECT skt.*, p.nama AS nama_pegawai 
+                  FROM " . $this->table . " skt 
+                  JOIN pegawai p ON skt.nrp_pegawai = p.nrp_pegawai";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        $data = [];
+        while ($row = $result->fetch_assoc()) {
+            $data[] = $row;
         }
     
-        // Lakukan insert data
+        return $data; // Kembalikan semua data dalam bentuk array
+    }
+    
+
+    public function create() {
         $query = "INSERT INTO " . $this->table . " 
                   (tanggal_sk, nrp_pegawai, deskripsi, softfile) 
                   VALUES (?, ?, ?, ?)";

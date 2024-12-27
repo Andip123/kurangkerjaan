@@ -40,43 +40,48 @@ switch ($method) {
         }
         break;
 
-    case 'POST':
-        // Handle POST request (Create data)
-        $input = json_decode(file_get_contents('php://input'), true);
-
-        if (!isset($input['nrp_pegawai'], $input['nama'], $input['email'], $input['nomor_hp'], $input['kode_bagian'], $input['pangkat'], $input['jabatan'], $input['deskripsi'])) {
-            echo json_encode([
-                "status" => "error",
-                "message" => "Data tidak lengkap"
-            ]);
-            exit;
-        }
-
-        $pegawai->nrp_pegawai = $input['nrp_pegawai'];
-        $pegawai->nama = $input['nama'];
-        $pegawai->email = $input['email'];
-        $pegawai->nomor_hp = $input['nomor_hp'];
-        $pegawai->kode_bagian = $input['kode_bagian'];
-        $pegawai->pangkat = $input['pangkat'];
-        $pegawai->jabatan = $input['jabatan'];
-        $pegawai->deskripsi = $input['deskripsi'];
-
-        $data = $pegawai->create();
-
-        if ($data) {
-            echo json_encode([
-                "status" => "success",
-                "message" => "Data berhasil ditambahkan",
-                "data" => $data
-            ]);
-        } else {
-            echo json_encode([
-                "status" => "error",
-                "message" => "Gagal menambahkan data"
-            ]);
-        }
-        break;
-
+        case 'POST':
+            $input = json_decode(file_get_contents('php://input'), true);
+        
+            if (!isset($input['nrp_pegawai'], $input['nama'], $input['email'], $input['nomor_hp'], $input['kode_bagian'], $input['pangkat'], $input['jabatan'], $input['deskripsi'])) {
+                echo json_encode([
+                    "status" => "error",
+                    "message" => "Data tidak lengkap"
+                ]);
+                exit;
+            }
+        
+            $pegawai->nrp_pegawai = $input['nrp_pegawai'];
+            $pegawai->nama = $input['nama'];
+            $pegawai->email = $input['email'];
+            $pegawai->nomor_hp = $input['nomor_hp'];
+            $pegawai->kode_bagian = $input['kode_bagian'];
+            $pegawai->pangkat = $input['pangkat'];
+            $pegawai->jabatan = $input['jabatan'];
+            $pegawai->deskripsi = $input['deskripsi'];
+        
+            // Validasi kode_bagian
+            if (!$pegawai->isKodeBagianValid($pegawai->kode_bagian)) {
+                echo json_encode([
+                    "status" => "error",
+                    "message" => "Kode bagian '" . $pegawai->kode_bagian . "' tidak ditemukan di tabel divisi"
+                ]);
+                exit;
+            }
+        
+            if ($pegawai->create()) {
+                echo json_encode([
+                    "status" => "success",
+                    "message" => "Data pegawai berhasil ditambahkan"
+                ]);
+            } else {
+                echo json_encode([
+                    "status" => "error",
+                    "message" => "Gagal menambahkan data pegawai"
+                ]);
+            }
+            break;
+        
         case 'PUT':
             try {
                 // Handle PUT request (Update data)

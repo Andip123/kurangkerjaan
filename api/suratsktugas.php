@@ -7,15 +7,12 @@ require_once '../models/ActivityLog.php';
 $database = new Database();
 $conn = $database->getConnection();
 $activityLog = new ActivityLog($conn);
-
 $suratSkTugas = new SuratSkTugas($conn);
 
-// Cek request method
 $method = $_SERVER['REQUEST_METHOD'];
 
 switch ($method) {
     case 'GET':
-        // Handle GET request
         if (isset($_GET['id'])) {
             $id = intval($_GET['id']);
             $data = $suratSkTugas->getById($id);
@@ -43,7 +40,7 @@ switch ($method) {
         case 'POST':
             $input = json_decode(file_get_contents('php://input'), true);
         
-            if (!isset($input['tanggal_sk'], $input['nrp_pegawai'], $input['deskripsi'], $input['softfile'])) {
+            if (!isset($input['tanggal_sk'], $input['nrp_pegawai'], $input['deskripsi'], $input['softfile'], $input['nama_pegawai'])) {
                 echo json_encode([
                     "status" => "error",
                     "message" => "Data tidak lengkap"
@@ -55,15 +52,17 @@ switch ($method) {
             $suratSkTugas->nrp_pegawai = $input['nrp_pegawai'];
             $suratSkTugas->deskripsi = $input['deskripsi'];
             $suratSkTugas->softfile = $input['softfile'];
+            $suratSkTugas->nama_pegawai = $input['nama_pegawai'];
         
-            $result = $suratSkTugas->create();
-        
-            if (isset($result['error'])) {
+            if (!$suratSkTugas->isNamaPegawaiValid($suratSkTugas->nrp_pegawai, $suratSkTugas->nama_pegawai)) {
                 echo json_encode([
                     "status" => "error",
-                    "message" => $result['error']
+                    "message" => "Nama pegawai tidak sesuai dengan NRP pegawai"
                 ]);
-            } elseif ($result) {
+                exit;
+            }
+        
+            if ($result = $suratSkTugas->create()) {
                 echo json_encode([
                     "status" => "success",
                     "message" => "Data berhasil ditambahkan",
@@ -78,47 +77,50 @@ switch ($method) {
             break;
         
 
-        case 'PUT':
-            $input = json_decode(file_get_contents('php://input'), true);
-        
-            if (!isset($input['id'], $input['tanggal_sk'], $input['nrp_pegawai'], $input['deskripsi'], $input['softfile'])) {
-                echo json_encode([
-                    "status" => "error",
-                    "message" => "Data tidak lengkap"
-                ]);
-                exit;
-            }
-        
-            $id = intval($input['id']);
-            $suratSkTugas->tanggal_sk = $input['tanggal_sk'];
-            $suratSkTugas->nrp_pegawai = $input['nrp_pegawai'];
-            $suratSkTugas->deskripsi = $input['deskripsi'];
-            $suratSkTugas->softfile = $input['softfile'];
-        
-            $result = $suratSkTugas->update($id);
-        
-            if (isset($result['error'])) {
-                echo json_encode([
-                    "status" => "error",
-                    "message" => $result['error']
-                ]);
-            } elseif ($result) {
-                echo json_encode([
-                    "status" => "success",
-                    "message" => "Data berhasil diperbarui",
-                    "before_update" => $result['before_update'], // Menampilkan hanya satu data sebelum update
-                    "after_update" => $result['after_update']   // Menampilkan data yang baru diupdate
-                ]);
-            } else {
-                echo json_encode([
-                    "status" => "error",
-                    "message" => "Gagal memperbarui data"
-                ]);
-            }
-            break;
+    case 'PUT':
+        $input = json_decode(file_get_contents('php://input'), true);
+
+        if (!isset($input['id'], $input['tanggal_sk'], $input['nrp_pegawai'], $input['deskripsi'], $input['softfile'])) {
+            echo json_encode([
+                "status" => "error",
+                "message" => "Data tidak lengkap"
+            ]);
+            exit;
+        }
+
+        $id = intval($input['id']);
+        $suratSkTugas->tanggal_sk = $input['tanggal_sk'];
+        $suratSkTugas->nrp_pegawai = $input['nrp_pegawai'];
+        $suratSkTugas->deskripsi = $input['deskripsi'];
+        $suratSkTugas->softfile = $input['softfile'];
+
+        // Validasi nama pegawai sesuai dengan NRP
+        if (!$suratSkTugas->isNamaPegawaiValid($suratSkTugas->nrp_pegawai, $input['nama_pegawai'])) {
+            echo json_encode([
+                "status" => "error",
+                "message" => "Nama pegawai tidak sesuai dengan NRP pegawai"
+            ]);
+            exit;
+        }
+
+        $result = $suratSkTugas->update($id);
+
+        if (isset($result['error'])) {
+            echo json_encode([
+                "status" => "error",
+                "message" => $result['error']
+            ]);
+        } else {
+            echo json_encode([
+                "status" => "success",
+                "message" => "Data berhasil diperbarui",
+                "before_update" => $result['before_update'],
+                "after_update" => $result['after_update']
+            ]);
+        }
+        break;
 
     case 'DELETE':
-        // Handle DELETE request
         if (!isset($_GET['id'])) {
             echo json_encode([
                 "status" => "error",
@@ -131,7 +133,6 @@ switch ($method) {
         $deletedData = $suratSkTugas->delete($id);
 
         if ($deletedData) {
-            $activityLog->log(1, "DELETE", "Menghapus surat SK tugas dengan ID: $id");
             echo json_encode([
                 "status" => "success",
                 "message" => "Data berhasil dihapus",

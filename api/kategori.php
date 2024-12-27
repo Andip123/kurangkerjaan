@@ -15,34 +15,23 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 switch ($method) {
     case 'GET':
-        // Handle GET request (Read data)
         if (isset($_GET['id'])) {
             $id = intval($_GET['id']);
-            $stmt = $kategori->getById($id);
+            $data = $kategori->getById($id);
 
-            $stmt->bind_result($id, $nama, $deskripsi);
-
-            $data = [];
-            while ($stmt->fetch()) {
-                $data = [
-                    "id" => $id,
-                    "nama" => $nama,
-                    "deskripsi" => $deskripsi
-                ];
+            if ($data) {
+                echo json_encode([
+                    "status" => "success",
+                    "data" => $data
+                ]);
+            } else {
+                echo json_encode([
+                    "status" => "error",
+                    "message" => "Data tidak ditemukan"
+                ]);
             }
-
-            echo json_encode([
-                "status" => "success",
-                "data" => $data
-            ]);
         } else {
-            $result = $kategori->getAll();
-
-            $data = [];
-            while ($row = $result->fetch_assoc()) {
-                $data[] = $row;
-            }
-
+            $data = $kategori->getAll();
             echo json_encode([
                 "status" => "success",
                 "data" => $data
@@ -51,7 +40,6 @@ switch ($method) {
         break;
 
     case 'POST':
-        // Handle POST request (Create data)
         $input = json_decode(file_get_contents('php://input'), true);
 
         if (!isset($input['nama'], $input['deskripsi'])) {
@@ -65,10 +53,13 @@ switch ($method) {
         $kategori->nama = $input['nama'];
         $kategori->deskripsi = $input['deskripsi'];
 
-        if ($kategori->create()) {
+        $createdData = $kategori->create();
+
+        if ($createdData) {
             echo json_encode([
                 "status" => "success",
-                "message" => "Data berhasil ditambahkan"
+                "message" => "Data berhasil ditambahkan",
+                "data" => $kategori->getById($conn->insert_id) // Data baru
             ]);
         } else {
             echo json_encode([
@@ -79,7 +70,6 @@ switch ($method) {
         break;
 
     case 'PUT':
-        // Handle PUT request (Update data)
         $input = json_decode(file_get_contents('php://input'), true);
 
         if (!isset($input['id'], $input['nama'], $input['deskripsi'])) {
@@ -91,13 +81,26 @@ switch ($method) {
         }
 
         $id = intval($input['id']);
+        $beforeUpdate = $kategori->getById($id);
+
+        if (!$beforeUpdate) {
+            echo json_encode([
+                "status" => "error",
+                "message" => "Data dengan ID $id tidak ditemukan"
+            ]);
+            exit;
+        }
+
         $kategori->nama = $input['nama'];
         $kategori->deskripsi = $input['deskripsi'];
 
         if ($kategori->update($id)) {
+            $afterUpdate = $kategori->getById($id);
             echo json_encode([
                 "status" => "success",
-                "message" => "Data berhasil diperbarui"
+                "message" => "Data berhasil diperbarui",
+                "before_update" => $beforeUpdate,
+                "after_update" => $afterUpdate
             ]);
         } else {
             echo json_encode([
@@ -108,7 +111,6 @@ switch ($method) {
         break;
 
     case 'DELETE':
-        // Handle DELETE request
         $input = json_decode(file_get_contents('php://input'), true);
 
         if (isset($_GET['id'])) {
@@ -123,10 +125,13 @@ switch ($method) {
             exit;
         }
 
-        if ($kategori->delete($id)) {
+        $dataBeforeDelete = $kategori->getById($id);
+
+        if ($dataBeforeDelete && $kategori->delete($id)) {
             echo json_encode([
                 "status" => "success",
-                "message" => "Data berhasil dihapus"
+                "message" => "Data berhasil dihapus",
+                "deleted_data" => $dataBeforeDelete
             ]);
         } else {
             echo json_encode([

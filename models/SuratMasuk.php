@@ -1,7 +1,7 @@
 <?php
 class SuratMasuk {
     private $conn;
-    private $table_name = "surat_masuk";
+    private $table = "surat_masuk"; // Menggunakan $table yang konsisten
 
     public $id;
     public $penerima_id;
@@ -15,44 +15,83 @@ class SuratMasuk {
         $this->conn = $db;
     }
 
-    // **Read All Data**
+    public function getById($id) {
+        $query = "SELECT * FROM " . $this->table . " WHERE id = ?";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bind_param("i", $id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        if ($result->num_rows === 0) {
+            return null;
+        }
+
+        return $result->fetch_assoc();
+    }
+
+    public function isPenerimaNamaValid($penerima_id, $penerima_nama) {
+        $query = "SELECT COUNT(*) AS count FROM pegawai WHERE id = ? AND nama = ?";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bind_param("is", $penerima_id, $penerima_nama);
+        $stmt->execute();
+        $stmt->bind_result($count);
+        $stmt->fetch();
+        $stmt->close();
+        return $count > 0;
+    }
+    
+
     public function readAll() {
         $query = "SELECT sm.*, p.nama AS penerima_nama 
-                  FROM " . $this->table_name . " sm 
+                  FROM " . $this->table . " sm 
                   JOIN pegawai p ON sm.penerima_id = p.id";
         $stmt = $this->conn->prepare($query);
         $stmt->execute();
-        
         $result = $stmt->get_result();
-        $data = [];
 
+        $data = [];
         while ($row = $result->fetch_assoc()) {
-            $data[] = $row; // Memasukkan setiap baris data ke dalam array
+            $data[] = $row;
         }
 
-        return $data; // Mengembalikan array data
+        return $data;
     }
 
-    // **Read Single Data**
-    public function readSingle() {
+    public function isPenerimaIdValid($id) {
+        $query = "SELECT COUNT(*) AS count FROM pegawai WHERE id = ?";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bind_param("i", $id);
+        $stmt->execute();
+        $stmt->bind_result($count);
+        $stmt->fetch();
+        $stmt->close();
+        return $count > 0;
+    }
+
+    public function readSingle($id) {
         $query = "SELECT sm.*, p.nama AS penerima_nama 
-                  FROM " . $this->table_name . " sm 
+                  FROM " . $this->table . " sm 
                   JOIN pegawai p ON sm.penerima_id = p.id
                   WHERE sm.id = ?";
+    
         $stmt = $this->conn->prepare($query);
-        $stmt->bind_param("i", $this->id);
+        $stmt->bind_param("i", $id);
         $stmt->execute();
-        
+    
         $result = $stmt->get_result();
-        return $result->fetch_assoc(); // Mengembalikan data sebagai array asosiatif
+        if ($result->num_rows === 0) {
+            return null;
+        }
+    
+        return $result->fetch_assoc();
     }
+    
+    
 
-    // **Create Data**
     public function create() {
-        $query = "INSERT INTO " . $this->table_name . " 
+        $query = "INSERT INTO " . $this->table . " 
                   (penerima_id, kode_surat, tanggal_masuk, asal_surat, softfile, jenis_surat)
                   VALUES (?, ?, ?, ?, ?, ?)";
-
         $stmt = $this->conn->prepare($query);
         $stmt->bind_param(
             "isssss",
@@ -63,18 +102,25 @@ class SuratMasuk {
             $this->softfile,
             $this->jenis_surat
         );
-
+    
         if ($stmt->execute()) {
-            $this->id = $this->conn->insert_id; // Ambil ID data baru
-            return $this->readSingle(); // Ambil data yang baru dibuat
+            // Ambil data lengkap termasuk penerima_nama
+            $newId = $this->conn->insert_id;
+            $query = "SELECT sm.*, p.nama AS penerima_nama 
+                      FROM " . $this->table . " sm 
+                      JOIN pegawai p ON sm.penerima_id = p.id 
+                      WHERE sm.id = ?";
+            $stmt = $this->conn->prepare($query);
+            $stmt->bind_param("i", $newId);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            return $result->fetch_assoc();
         }
-
         return false;
     }
-
-    // **Update Data**
+    
     public function update() {
-        $query = "UPDATE " . $this->table_name . " 
+        $query = "UPDATE " . $this->table . " 
                   SET penerima_id = ?, 
                       kode_surat = ?, 
                       tanggal_masuk = ?, 
@@ -82,7 +128,7 @@ class SuratMasuk {
                       softfile = ?, 
                       jenis_surat = ?
                   WHERE id = ?";
-
+    
         $stmt = $this->conn->prepare($query);
         $stmt->bind_param(
             "isssssi",
@@ -94,36 +140,41 @@ class SuratMasuk {
             $this->jenis_surat,
             $this->id
         );
-
+    
         if ($stmt->execute()) {
-            return $this->readSingle(); // Ambil data yang baru diperbarui
+            return true;
         }
         return false;
     }
+    
 
-    // **Delete Data**
-    public function delete() {
-        // Ambil data sebelum dihapus
-        $query_select = "SELECT * FROM " . $this->table_name . " WHERE id = ?";
+    public function delete($id) {
+        // Ambil data sebelum dihapus, termasuk penerima_nama
+        $query_select = "SELECT sm.*, p.nama AS penerima_nama 
+                         FROM " . $this->table . " sm
+                         JOIN pegawai p ON sm.penerima_id = p.id
+                         WHERE sm.id = ?";
         $stmt_select = $this->conn->prepare($query_select);
-        $stmt_select->bind_param("i", $this->id);
+        $stmt_select->bind_param("i", $id);
         $stmt_select->execute();
-
+    
         $result = $stmt_select->get_result();
         $dataBeforeDelete = $result->fetch_assoc();
-
+    
         if ($dataBeforeDelete) {
             // Hapus data
-            $query_delete = "DELETE FROM " . $this->table_name . " WHERE id = ?";
+            $query_delete = "DELETE FROM " . $this->table . " WHERE id = ?";
             $stmt_delete = $this->conn->prepare($query_delete);
-            $stmt_delete->bind_param("i", $this->id);
-
+            $stmt_delete->bind_param("i", $id);
+    
             if ($stmt_delete->execute()) {
                 return $dataBeforeDelete; // Kembalikan data yang dihapus
             }
         }
-
+    
         return false; // Jika gagal atau data tidak ditemukan
     }
+    
+    
 }
 ?>
